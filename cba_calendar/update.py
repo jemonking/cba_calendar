@@ -78,34 +78,63 @@ def load_previous(base_url, bootstrap=False, fetcher=None):
 
 
 def _page(state, report, base_url):
+    """Small subscription landing page; do not offer an ICS import/download CTA."""
     url = base_url.rstrip('/') + '/shanghai-sharks.ics'
-    webcal = 'webcal://' + urlsplit(url).netloc + urlsplit(url).path
-    stamp = datetime.fromisoformat(state['checked_at']).astimezone(ZoneInfo('Asia/Shanghai'))
-    audit = report['crosscheck']
-    if audit.get('status') == 'unavailable':
-        evidence = '备用来源本轮未能核对；以下日程来自官方公开接口。'
-    else:
-        evidence = f'本轮备用来源匹配 {audit["matched"]} 场；缺失或不一致 {len(audit["missing_official_ids"])} 场。采用官方赛程。'
-    rows = []
-    for event in sorted(state['events'].values(), key=lambda e: (e['start'], e['id'])):
-        start = event['start'][:16].replace('T', ' ')
-        place = '主场' if event['home_id'] == 29125 else '客场'
-        label = {'scheduled': '', 'live': ' · 进行中', 'completed': ' · 已完赛', 'cancelled': ' · 已取消', 'tentative': ' · 时间待定'}[event['status']]
-        rows.append(f'<tr><td>{html.escape(start)}</td><td>{html.escape(event["home"])} vs {html.escape(event["away"])}</td><td>{place}{label}</td></tr>')
-    return f'''<!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>CBA Calendar · 上海大鲨鱼赛程</title>
+    parsed = urlsplit(url)
+    webcal = 'webcal://' + parsed.netloc + parsed.path
+    checked = datetime.fromisoformat(state['checked_at']).astimezone(ZoneInfo('Asia/Shanghai'))
+    template = """<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="上海久事大鲨鱼 CBA 赛程 Apple 日历订阅">
+<title>上海大鲨鱼赛程 · Apple 日历订阅</title>
 <style>
-:root{{color-scheme:light;--ink:#142e47;--blue:#004b85;--line:#d5e1ea}}*{{box-sizing:border-box}}body{{margin:0;background:#f5f8fa;color:var(--ink);font:16px/1.7 system-ui,-apple-system,"PingFang SC",sans-serif}}main{{max-width:900px;margin:auto;padding:64px 24px}}.eyebrow{{letter-spacing:.18em;color:var(--blue);font-weight:700;font-size:13px}}h1{{font-size:clamp(30px,6vw,48px);line-height:1.25;margin:16px 0}}h2{{font-size:22px;margin-top:38px}}.lead{{max-width:650px;color:#415b70}}a{{color:var(--blue)}}.button{{display:inline-block;margin:18px 0 8px;padding:12px 24px;background:var(--blue);color:white;border-radius:6px;text-decoration:none;font-weight:700}}.url{{display:block;overflow-wrap:anywhere;padding:12px;background:white;border:1px solid var(--line);border-radius:6px;font:14px/1.6 ui-monospace,monospace}}.note{{font-size:14px;color:#4e6577}}.table-wrap{{overflow-x:auto}}table{{border-collapse:collapse;width:100%;background:white}}th,td{{padding:12px;text-align:left;border-bottom:1px solid var(--line);font-size:14px}}th{{color:var(--blue)}}td:first-child{{white-space:nowrap}}footer{{margin-top:36px;border-top:1px solid var(--line);padding-top:20px;font-size:13px}}a:focus-visible{{outline:3px solid #e48a2e;outline-offset:4px}}@media(max-width:500px){{main{{padding:32px 16px}}th,td{{padding:10px 8px}}}}
-</style></head><body><main><div class="eyebrow">CBA CALENDAR · 2026–2027</div><h1>上海大鲨鱼 CBA 赛程</h1>
-<p class="lead">订阅一次，持续获取上海久事的常规赛与已公布的季后赛。官方调整比赛时间后，在同一条日程中更新。</p>
-<a class="button" href="{html.escape(webcal, quote=True)}">添加到 Apple 日历</a><p class="note">请使用订阅功能；下载后导入不会持续更新。</p>
-<span class="url">{html.escape(url)}</span><p><a href="shanghai-sharks.ics">查看 ICS 文件</a></p>
-<h2>如何订阅</h2><ol><li>iPhone / iPad：点击上方按钮并确认订阅；或在日历 App 中选择“日历 → 添加日历 → 添加订阅日历”，粘贴上方地址。</li><li>Mac：打开日历，选择“文件 → 新建日历订阅”，粘贴地址，并设置自动刷新。</li><li>已订阅后无需重复添加。刷新速度取决于 Apple Calendar 和你的设备设置。</li></ol>
-<h2>更新与范围</h2><p>每天北京时间 10:23、18:23 检查官方赛程。GitHub 排队和客户端刷新可能产生延迟。包含常规赛和已公布的季后赛；不含季前赛、俱乐部杯与全明星赛。</p>
-<p>北京时间显示。比赛预计持续 2 小时；延期标为待定，取消保留取消标记。来源故障时继续提供上次成功版本。</p>
-<p class="note">最近核验：{stamp:%Y-%m-%d %H:%M} 北京时间 · 常规赛 {report['regular_count']} 场 · 日历共 {report['event_count']} 场<br>{html.escape(evidence)}<br>浙江浙商证券为浙江广厦队当前官方冠名；日历沿用官方队名。</p>
-<h2>比赛安排</h2><div class="table-wrap"><table><thead><tr><th scope="col">北京时间</th><th scope="col">比赛</th><th scope="col">上海主客场 / 状态</th></tr></thead><tbody>{''.join(rows)}</tbody></table></div>
-<footer>公开赛程来源：<a href="https://www.cbaleague.com/">CBA 官方</a> · <a href="https://nba.90vs.com/zl/3/index.html">90vs 交叉核对</a> · <a href="https://github.com/jemonking/cba_calendar">项目与故障说明</a><br>非官方球迷项目，与 CBA 及俱乐部无隶属关系。</footer></main></body></html>'''
+*{box-sizing:border-box}
+body{margin:0;background:#f6f8fa;color:#182e3d;font:16px/1.65 system-ui,-apple-system,"PingFang SC",sans-serif}
+main{max-width:640px;margin:0 auto;padding:64px 22px}
+small{color:#536777;font-weight:700;letter-spacing:.1em}
+h1{font-size:clamp(29px,6vw,42px);line-height:1.3;margin:12px 0}
+p{margin:12px 0;color:#42596a}
+.button{display:inline-block;margin:16px 0 6px;padding:12px 22px;border-radius:8px;background:#135b86;color:white;text-decoration:none;font-weight:700}
+.button:focus-visible,a:focus-visible{outline:3px solid #bd7213;outline-offset:4px}
+.notice{font-size:14px}
+section{margin:26px 0;padding:20px;border:1px solid #dbe4ea;border-radius:10px;background:white}
+h2{font-size:18px;margin:0 0 10px}
+code{display:block;overflow-wrap:anywhere;padding:12px;border-radius:6px;background:#f2f5f7;font:13px/1.7 ui-monospace,SFMono-Regular,monospace}
+footer{border-top:1px solid #dbe4ea;padding-top:18px;font-size:13px;color:#536777}
+footer a{color:#135b86}
+@media(max-width:480px){main{padding:32px 18px}}
+</style>
+</head>
+<body>
+<main>
+<small>CBA · 2026–2027</small>
+<h1>🏀 上海大鲨鱼赛程</h1>
+<p>订阅上海久事的常规赛及已公布的季后赛。比赛改期、比分更新后，日历会随订阅刷新。</p>
+<a class="button" href="__WEBCAL__">订阅到 Apple 日历</a>
+<p class="notice"><strong>请选择「订阅」，不要下载 ICS 后导入现有日历。</strong> 导入的比赛不会自动更新，也无法作为一组取消订阅。</p>
+<section>
+<h2>iPhone 手动订阅</h2>
+<p>日历 App →「日历」→「添加日历」→「添加订阅日历」，粘贴此地址：</p>
+<code>__ICS_URL__</code>
+<p class="notice">以后要移除全部比赛：日历列表 → 订阅日历旁的 ⓘ →「取消订阅」。</p>
+</section>
+<footer>最近核验：__CHECKED__（北京时间） · __EVENT_COUNT__ 场<br>
+数据来源：<a href="https://www.cbaleague.com/">CBA 官方</a> ·
+<a href="https://github.com/jemonking/cba_calendar">GitHub 项目</a> ·
+非官方球迷项目</footer>
+</main>
+</body>
+</html>
+"""
+    return (template
+            .replace('__WEBCAL__', html.escape(webcal, quote=True))
+            .replace('__ICS_URL__', html.escape(url))
+            .replace('__CHECKED__', checked.strftime('%Y-%m-%d %H:%M'))
+            .replace('__EVENT_COUNT__', str(report['event_count'])))
+
 
 
 def build(output, official_payload, backup_html, previous, now, base_url=DEFAULT_BASE):
