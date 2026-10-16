@@ -21,15 +21,4 @@
 - 比赛使用稳定 UID；官方改期会更新原事件。抓取失败时保留上次成功版本。
 - Apple 日历的刷新时间由客户端决定，并非实时推送。
 
-## 开发与维护
-
-Python 3.12+；代码、测试与 Pages 部署工作流均在本仓库。
-
-```bash
-python -m pip install -e '.[test]'
-python -m pytest -q
-```
-
-维护细节见 [数据源核验](docs/source-audit.md)及[验证记录](docs/verification.md)。`main` 分支通过 GitHub Actions 发布 Pages；首次发布已完成，**不要再次使用 bootstrap**。
-
 非官方球迷项目，与 CBA 或上海久事俱乐部无隶属关系。
