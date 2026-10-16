@@ -31,6 +31,19 @@ def test_representative_build_and_restore(payload, tmp_path):
     assert restore == state
 
 
+def test_landing_page_offers_subscription_not_ics_import(payload, tmp_path):
+    output = tmp_path / 'site'
+    build(output, payload, None, None, NOW)
+    page = (output / 'index.html').read_text(encoding='utf-8')
+    assert 'href="webcal://jemonking.github.io/cba_calendar/shanghai-sharks.ics"' in page
+    assert '添加订阅日历' in page
+    assert '取消订阅' in page
+    assert '不要下载 ICS 后导入' in page
+    assert '查看 ICS 文件' not in page
+    assert '<table' not in page
+    assert 'href="shanghai-sharks.ics"' not in page
+
+
 def test_build_failure_preserves_all_previous_files(payload, tmp_path):
     output = tmp_path / 'site'
     build(output, payload, None, None, NOW)
