@@ -1,5 +1,7 @@
 # 验证与交付记录
 
+> 本文是 **2026-10-16 首次发布前**的验证快照，以下「尚未部署」状态为历史记录。当天已通过 [GitHub Actions 首次部署](https://github.com/jemonking/cba_calendar/actions/runs/38879715357)。后续状态请以 [Actions](https://github.com/jemonking/cba_calendar/actions) 为准。
+
 日期：2026-10-16。状态：**本地实现与验证完成；公开推送、云端CI和Pages首次部署待授权。**
 
 | 验证层 | 结果 | 覆盖范围 |
