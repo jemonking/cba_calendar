@@ -1,0 +1,24 @@
+name: Tests
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -e '.[test]'
+      - run: python -m pytest -q
+      - name: Build real captured schedule offline
+        run: >-
+          python -m cba_calendar.update --preview
+          --official-file tests/fixtures/official.json
+          --backup-file tests/fixtures/90vs.html
+          --output preview --log preview-log.json
