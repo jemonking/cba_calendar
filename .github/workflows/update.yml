@@ -1,0 +1,87 @@
+name: Update and deploy calendar
+on:
+  schedule:
+    # GitHub cron uses UTC: Asia/Shanghai 10:23 and 18:23.
+    - cron: '23 2,10 * * *'
+  workflow_dispatch:
+    inputs:
+      bootstrap:
+        description: '首次发布且线上 state.json 为404时才开启；上线后禁止开启'
+        type: boolean
+        required: false
+        default: false
+  push:
+    branches: [main]
+    paths:
+      - 'cba_calendar/**'
+      - 'pyproject.toml'
+      - '.github/workflows/update.yml'
+permissions:
+  contents: read
+# One lock covers BOTH restore/build and deploy; never overwrite a newer revision.
+concurrency:
+  group: cba-calendar-pages
+  cancel-in-progress: false
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      ready: ${{ steps.generate.outcome == 'success' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -e '.[test]'
+      - run: python -m pytest -q
+      - name: Restore published revisions and build validated calendar
+        id: generate
+        env:
+          BOOTSTRAP: ${{ github.event_name == 'workflow_dispatch' && inputs.bootstrap == true }}
+        run: |
+          args=()
+          if [ "$BOOTSTRAP" = "true" ]; then args+=(--bootstrap); fi
+          python -m cba_calendar.update "${args[@]}" --output site --log update-log.json
+      - name: Update summary
+        if: always()
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          p = Path('update-log.json')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as out:
+              if p.exists():
+                  report = json.loads(p.read_text())
+                  out.write('## CBA Calendar\n\n```json\n' + json.dumps(report, ensure_ascii=False, indent=2) + '\n```\n')
+              else:
+                  out.write('## CBA Calendar\n\nBuild/test failed before collection. Previous Pages deployment is unchanged. Inspect the failed step.\n')
+          PY
+      - name: Preserve structured diagnostic log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: calendar-update-log-${{ github.run_id }}-${{ github.run_attempt }}
+          path: update-log.json
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Package complete Pages site
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+  deploy:
+    needs: build
+    if: needs.build.outputs.ready == 'true'
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Deploy Pages artifact
+        id: deployment
+        uses: actions/deploy-pages@v4

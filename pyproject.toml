@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cba-calendar"
+version = "0.1.0"
+description = "Failure-safe Shanghai Sharks CBA iCalendar subscription"
+requires-python = ">=3.12"
+
+[project.optional-dependencies]
+test = ["pytest==8.4.2", "icalendar==6.3.2", "PyYAML==6.0.3"]
+
+[tool.setuptools.packages.find]
+include = ["cba_calendar*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
